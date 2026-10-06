@@ -1,13 +1,16 @@
 """End-to-end browser test: filtered CSV download must only contain filtered rows."""
 import csv
 import io
+import os
 import subprocess
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+ROOT = Path(__file__).resolve().parent
 BASE = "http://127.0.0.1:5055"
 DOMAINS = [
     "abc.si",            # registered
@@ -37,8 +40,8 @@ def read_csv(download):
 
 server = subprocess.Popen(
     [sys.executable, "app.py"],
-    cwd=r"C:\Users\Amine\Desktop\si",
-    env={**__import__("os").environ, "PORT": "5055"},
+    cwd=ROOT,
+    env={**os.environ, "PORT": "5055"},
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
 )
@@ -161,7 +164,7 @@ try:
         page.fill("#search", "")
         page.click('.chip[data-filter="all"]')
         page.wait_for_timeout(300)
-        page.screenshot(path=r"C:\Users\Amine\Desktop\si\_ui.png", full_page=True)
+        page.screenshot(path=str(ROOT / "_ui.png"), full_page=True)
         browser.close()
 finally:
     server.terminate()

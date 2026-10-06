@@ -1,6 +1,18 @@
-import json, subprocess, sys, time, urllib.request
+"""API smoke test. Starts its own server, so no manual setup is needed."""
+import atexit
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
 
-BASE = "http://127.0.0.1:5000"
+ROOT = Path(__file__).resolve().parent
+PORT = "5056"
+BASE = "http://127.0.0.1:" + PORT
+
 
 def req(path, data=None, method=None):
     body = json.dumps(data).encode() if data is not None else None
@@ -13,6 +25,25 @@ def req(path, data=None, method=None):
             return resp.status, resp.read(), dict(resp.headers)
     except urllib.error.HTTPError as e:
         return e.code, e.read(), dict(e.headers)
+
+
+server = subprocess.Popen(
+    [sys.executable, "app.py"],
+    cwd=ROOT,
+    env={**os.environ, "PORT": PORT},
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+atexit.register(server.terminate)
+
+for _ in range(40):
+    try:
+        urllib.request.urlopen(BASE, timeout=1)
+        break
+    except Exception:
+        time.sleep(0.25)
+else:
+    raise SystemExit("server did not start")
 
 domains = ["abc.si", "MeritBeauty.si", "google.si", "si.si", "abc",
            "  https://www.abc.si/path  ", "a.si", "-bad.si", "ABC.SI",
@@ -41,8 +72,9 @@ s, csv_bytes, hdr = req(f"/api/job/{job['id']}/export")
 print("\nexport:", s, hdr.get("Content-Type"), hdr.get("Content-Disposition"))
 print(csv_bytes.decode("utf-8-sig"))
 
-# error paths
-print("empty start ->", req("/api/start", {"domains": []})[0])
-print("bad delay   ->", req("/api/start", {"domains": ["abc.si"], "delay": "abc"})[0])
-print("missing job ->", req("/api/job/doesnotexist")[0])
-print("stop        ->", req(f"/api/job/{job['id']}/stop", {}, method="POST")[0])
+# error paths (non-numeric delay is deliberately coerced to the default,
+# because the UI sends NaN->null when the delay box is cleared)
+print("empty start ->", req("/api/start", {"domains": []})[0], "(want 400)")
+print("bad delay   ->", req("/api/start", {"domains": ["abc.si"], "delay": "abc"})[0], "(want 200, coerced)")
+print("missing job ->", req("/api/job/doesnotexist")[0], "(want 404)")
+print("stop        ->", req(f"/api/job/{job['id']}/stop", {}, method="POST")[0], "(want 200)")

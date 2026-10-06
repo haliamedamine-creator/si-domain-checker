@@ -76,17 +76,29 @@ and the UI tells you to wait one hour.
 - no `--` at positions 3–4
 - letters (Latin incl. `č`, `š`, `ž`), digits and `-` only
 
+## Requirements
+
+- **Python 3.9+**
+- **Flask 2.0 or newer** — the API uses the `@app.get` / `@app.post` shorthand (added in 2.0)
+- `requests`
+
+```bash
+pip install "flask>=2.0" requests
+```
+
 ## Tests
+
+Both scripts start their own server on a private port and shut it down
+afterwards, so nothing has to be running first:
 
 ```bash
 python smoke_test.py   # API: start / poll / export / error paths
-python test_ui.py      # Browser: filter + CSV contents (needs Playwright)
+python test_ui.py      # browser: filters + CSV contents (extra dep below)
 ```
 
-## Requirements
+`test_ui.py` additionally needs Playwright with a browser installed:
 
 ```bash
-pip install flask requests
-# optional, only for test_ui.py:
-pip install playwright && playwright install chromium
+pip install playwright
+playwright install chromium
 ```
