@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs / local runs
+*.log
+
+# Local-only artifacts (not part of the app)
+_ui.png
+captures/
+register-si-network-log.md

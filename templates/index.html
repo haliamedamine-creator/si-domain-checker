@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SI Domain Checker</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v={{ build }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◉</text></svg>">
+</head>
+<body>
+
+<div class="glow glow-a"></div>
+<div class="glow glow-b"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">.si</span>
+    <div>
+      <h1>Domain Checker</h1>
+      <p>Availability lookups against <code>rdap.register.si</code></p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="live" id="liveDot" hidden><i></i>live</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── input ───────────────────────────────────────────── -->
+  <section class="card">
+    <div class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="paste" role="tab">Paste list</button>
+      <button class="tab" data-tab="upload" role="tab">Upload .txt</button>
+    </div>
+
+    <div class="pane is-active" data-pane="paste">
+      <textarea id="input" spellcheck="false"
+        placeholder="One domain per line&#10;abc.si&#10;meritbeauty.si&#10;moja-domena.si"></textarea>
+      <p class="hint">One domain per line. <code>.si</code> is appended automatically, URLs and <code>www.</code> prefixes are cleaned up.</p>
+    </div>
+
+    <div class="pane" data-pane="upload">
+      <div class="drop" id="drop">
+        <input type="file" id="file" accept=".txt,.csv,.list,text/plain" hidden>
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v13"/>
+        </svg>
+        <strong id="dropTitle">Drop a .txt file here</strong>
+        <span id="dropSub">or click to browse &middot; one domain per line</span>
+      </div>
+      <p class="hint">Lines starting with <code>#</code> are ignored. Blank lines are skipped, duplicates removed.</p>
+    </div>
+
+    <div class="controls">
+      <label class="switch">
+        <input type="checkbox" id="details">
+        <span class="track"><span class="knob"></span></span>
+        <span class="switch-label">Fetch details
+          <small>registration &amp; expiry dates, registrar, nameservers — same request</small>
+        </span>
+      </label>
+
+      <label class="field">
+        <span>Delay</span>
+        <select id="delay">
+          <option value="0.2">0.2s</option>
+          <option value="0.5" selected>0.5s</option>
+          <option value="1">1s</option>
+          <option value="2">2s</option>
+        </select>
+      </label>
+
+      <button class="btn btn-primary" id="startBtn">
+        <span class="btn-text">Check domains</span>
+        <span class="btn-busy" hidden>Starting…</span>
+      </button>
+    </div>
+    <p class="error" id="formError" hidden></p>
+  </section>
+
+  <!-- ── progress ────────────────────────────────────────── -->
+  <section class="card progress-card" id="progressCard" hidden>
+    <div class="progress-head">
+      <div>
+        <span class="progress-title" id="progressTitle">Checking…</span>
+        <span class="progress-sub" id="progressSub"></span>
+      </div>
+      <button class="btn btn-ghost" id="stopBtn">Stop</button>
+    </div>
+    <div class="bar"><div class="bar-fill" id="barFill"></div></div>
+    <div class="progress-foot">
+      <span id="progressCount">0 / 0</span>
+      <span id="progressRate"></span>
+    </div>
+  </section>
+
+  <!-- ── stats ───────────────────────────────────────────── -->
+  <section class="stats" id="stats" hidden>
+    <div class="stat stat-available"><b id="c-available">0</b><span>Available</span></div>
+    <div class="stat stat-registered"><b id="c-registered">0</b><span>Registered</span></div>
+    <div class="stat stat-reserved"><b id="c-reserved">0</b><span>Reserved</span></div>
+    <div class="stat stat-invalid"><b id="c-invalid">0</b><span>Invalid</span></div>
+    <div class="stat stat-error"><b id="c-error">0</b><span>Errors</span></div>
+  </section>
+
+  <!-- ── results ─────────────────────────────────────────── -->
+  <section class="card results-card" id="resultsCard" hidden>
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="search" type="search" placeholder="Filter domains…">
+      </div>
+      <div class="chips" id="chips">
+        <button class="chip is-active" data-filter="all">All</button>
+        <button class="chip" data-filter="available">Available</button>
+        <button class="chip" data-filter="registered">Registered</button>
+        <button class="chip" data-filter="reserved">Reserved</button>
+        <button class="chip" data-filter="invalid">Invalid</button>
+        <button class="chip" data-filter="error">Errors</button>
+      </div>
+      <div class="toolbar-right">
+        <span class="showing" id="showing"></span>
+        <button class="btn btn-ghost" id="exportBtn" hidden>Download CSV</button>
+        <button class="btn btn-ghost" id="clearBtn">Clear</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="th-idx">#</th>
+            <th>Domain</th>
+            <th>Status</th>
+            <th class="th-detail" hidden>Registered</th>
+            <th class="th-detail" hidden>Expires</th>
+            <th class="th-detail" hidden>Registrar</th>
+            <th>Note</th>
+            <th class="th-time">Checked</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty">No results yet — paste a list or upload a file to begin.</div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <span>Local tool · results stay in your browser session</span>
+  <span>25 req/hour limit applies only to the register.si WHOIS widget — this uses RDAP instead</span>
+</footer>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="{{ url_for('static', filename='app.js') }}?v={{ build }}"></script>
+</body>
+</html>
